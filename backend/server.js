@@ -108,6 +108,55 @@ app.post('/api/sensors/data', async (req, res) => {
   }
 });
 
+// Endpoint data frontend
+app.get('/api/sensors/latest', async (req, res) => {
+  try {
+    const latestData = await SensorData.findOne()
+      .sort({ created_at: -1 })
+      .select('-__v');
+    
+    res.json({
+      success: true,
+      data: latestData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching latest data',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint history data
+app.get('/api/sensors/history', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const hours = parseInt(req.query.hours) || 24;
+    
+    const startTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+    
+    const history = await SensorData.find({
+      created_at: { $gte: startTime }
+    })
+    .sort({ created_at: -1 })
+    .limit(limit)
+    .select('-__v');
+    
+    res.json({
+      success: true,
+      count: history.length,
+      data: history
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching history',
+      error: error.message
+    });
+  }
+});
+
 // API Routes
 // Index
 app.get('/', (req, res) => {
@@ -115,7 +164,9 @@ app.get('/', (req, res) => {
     message: 'Sistema de Monitoreo ESP32',
     student: '2025178001',
     endpoints: {
-      'POST /api/sensors/data': 'Recibir datos del ESP32'
+      'POST /api/sensors/data': 'Recibir datos del ESP32',
+      'GET /api/sensors/latest': 'Obtener última lectura',
+      'GET /api/sensors/history': 'Obtener histórico',
     }
   });
 });
