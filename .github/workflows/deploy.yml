@@ -83,20 +83,20 @@ jobs:
     
     - name: Verify GCP Authentication
       run: |
-        echo "Verificando autenticación GCP..."
+        echo " Verificando autenticación GCP..."
         gcloud auth list --filter=status:ACTIVE --format="value(account)"
         gcloud config get-value project
         echo "✅ Autenticación exitosa"
     
     - name: Configure Docker for Artifact Registry
       run: |
-        echo "Configurando Docker para Artifact Registry..."
+        echo " Configurando Docker para Artifact Registry..."
         gcloud auth configure-docker $REGISTRY_URL --quiet
         echo "✅ Docker configurado"
     
     - name: Build Backend Docker Image
       run: |
-        echo "Construyendo imagen Docker del backend..."
+        echo " Construyendo imagen Docker del backend..."
         cd backend
         docker build . --platform linux/amd64 \
           -t $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:$GITHUB_SHA \
@@ -105,7 +105,7 @@ jobs:
     
     - name: Push Docker Image to Artifact Registry
       run: |
-        echo "Subiendo imagen a Artifact Registry..."
+        echo " Subiendo imagen a Artifact Registry..."
         echo "Registry: $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME"
         docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:$GITHUB_SHA
         docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:latest
@@ -113,7 +113,7 @@ jobs:
     
     - name: Deploy Backend to Cloud Run
       run: |
-        echo "Desplegando backend a Cloud Run..."
+        echo " Desplegando backend a Cloud Run..."
         gcloud run deploy $SERVICE_NAME \
           --image $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:$GITHUB_SHA \
           --platform managed \
@@ -132,14 +132,14 @@ jobs:
     - name: Get Backend Service URL
       run: |
         SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format='value(status.url)')
-        echo "Backend desplegado en: $SERVICE_URL"
+        echo " Backend desplegado en: $SERVICE_URL"
         echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
         echo "backend_url=$SERVICE_URL" >> $GITHUB_OUTPUT
       id: backend-deploy
     
     - name: Test Backend Deployment
       run: |
-        echo "Probando despliegue del backend..."
+        echo " Probando despliegue del backend..."
         sleep 30
         curl -f $SERVICE_URL/health || (echo "❌ Health check falló" && exit 1)
         echo "✅ Backend responde correctamente"
@@ -147,54 +147,56 @@ jobs:
     - name: Build Frontend for Production
       working-directory: ./frontend
       run: |
-        echo "Construyendo frontend para producción..."
+        echo " Construyendo frontend para producción..."
         npm ci
         npm run build
       env:
         VITE_API_URL: ${{ steps.backend-deploy.outputs.backend_url }}
     
-    - name: Build Frontend Docker Image
+    - name: Deploy Frontend to Cloud Storage with CDN
       run: |
-        echo "Construyendo imagen Docker del frontend..."
-        cd frontend
-        docker build . --platform linux/amd64 \
-          -t $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA \
-          -t $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:latest
-        echo "✅ Imagen frontend construida"
-    
-    - name: Push Frontend Docker Image
-      run: |
-        echo "Subiendo imagen frontend a Artifact Registry..."
-        docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA
-        docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:latest
-        echo "✅ Imagen frontend subida"
-    
-    - name: Deploy Frontend to Cloud Run
-      run: |
-        echo "Desplegando frontend a Cloud Run..."
-        gcloud run deploy esp32-monitor-frontend \
-          --image $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA \
-          --platform managed \
-          --region $REGION \
-          --allow-unauthenticated \
-          --port 80 \
-          --memory 512Mi \
-          --cpu 1 \
-          --max-instances 5 \
-          --min-instances 0 \
-          --concurrency 80 \
-          --timeout 300
-        echo "✅ Frontend desplegado exitosamente"
-    
-    - name: Get Frontend Service URL
-      run: |
-        FRONTEND_URL=$(gcloud run services describe esp32-monitor-frontend --region=$REGION --format='value(status.url)')
-        echo "Frontend desplegado en: $FRONTEND_URL"
+        echo " Desplegando frontend a Cloud Storage..."
+        
+        # Crear bucket si no existe
+        gsutil mb -p $PROJECT_ID -c STANDARD -l $REGION gs://${PROJECT_ID}-frontend-app || echo "Bucket ya existe"
+        
+        # Configurar bucket para sitio web estático
+        gsutil web set -m index.html -e index.html gs://${PROJECT_ID}-frontend-app
+        
+        # Hacer bucket público
+        gsutil iam ch allUsers:objectViewer gs://${PROJECT_ID}-frontend-app
+        
+        # Limpiar bucket antes de subir
+        gsutil -m rm -r gs://${PROJECT_ID}-frontend-app/** || echo "Bucket vacío"
+        
+        # Subir archivos con estructura preservada
+        gsutil -m cp -r frontend/dist/* gs://${PROJECT_ID}-frontend-app/
+        
+        # Configurar headers específicos por tipo de archivo
+        gsutil -m setmeta -h "Cache-Control:public,max-age=31536000,immutable" gs://${PROJECT_ID}-frontend-app/assets/**
+        gsutil -m setmeta -h "Cache-Control:no-cache,no-store,must-revalidate" gs://${PROJECT_ID}-frontend-app/index.html
+        gsutil -m setmeta -h "Content-Type:text/html" gs://${PROJECT_ID}-frontend-app/index.html
+        
+        # Configurar CORS
+        echo '[
+          {
+            "origin": ["*"],
+            "method": ["GET", "HEAD"],
+            "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+            "maxAgeSeconds": 3600
+          }
+        ]' > cors-config.json
+        gsutil cors set cors-config.json gs://${PROJECT_ID}-frontend-app
+        rm cors-config.json
+        
+        # Obtener URL pública
+        FRONTEND_URL="https://storage.googleapis.com/${PROJECT_ID}-frontend-app/index.html"
+        echo "✅ Frontend desplegado en: $FRONTEND_URL"
         echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
     
     - name: Final Health Check
       run: |
-        echo "Verificación final del despliegue..."
+        echo " Verificación final del despliegue..."
         echo "Backend URL: $SERVICE_URL"
         echo "Frontend URL: $FRONTEND_URL"
         
@@ -207,11 +209,11 @@ jobs:
         
         echo "✅ ¡Despliegue completado exitosamente!"
         echo ""
-        echo "URLs de tu aplicación:"
+        echo " URLs de tu aplicación:"
         echo "   Backend API: $SERVICE_URL"
         echo "   Frontend Web: $FRONTEND_URL"
         echo ""
-        echo "📝 Actualiza tu ESP32 con la nueva URL:"
+        echo " Actualiza tu ESP32 con la nueva URL:"
         echo "   #define ERP_URL \"$SERVICE_URL/api/sensors/data\""
 
   security-scan:
