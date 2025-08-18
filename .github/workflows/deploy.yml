@@ -33,7 +33,7 @@ jobs:
     - name: Install Backend Dependencies
       working-directory: ./backend
       run: |
-        npm ci
+        npm install
     
     - name: Lint Backend Code
       working-directory: ./backend
@@ -126,8 +126,7 @@ jobs:
           --min-instances 0 \
           --concurrency 80 \
           --timeout 300 \
-          --set-env-vars="NODE_ENV=production,MONGODB_URI=${{ secrets.MONGODB_URI }},CORS_ORIGIN=*" \
-          --service-account=${{ secrets.GCP_PROJECT_ID }}@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          --set-env-vars="NODE_ENV=production,MONGODB_URI=${{ secrets.MONGODB_URI }},CORS_ORIGIN=*"
         echo "✅ Backend desplegado exitosamente"
     
     - name: Get Backend Service URL
@@ -142,7 +141,7 @@ jobs:
       run: |
         echo "Probando despliegue del backend..."
         sleep 30
-        curl -f $SERVICE_URL/health || (echo "Health check falló" && exit 1)
+        curl -f $SERVICE_URL/health || (echo "❌ Health check falló" && exit 1)
         echo "✅ Backend responde correctamente"
     
     - name: Build Frontend for Production
@@ -189,8 +188,8 @@ jobs:
         echo "✅ ¡Despliegue completado exitosamente!"
         echo ""
         echo " URLs de tu aplicación:"
-        echo "  Backend API: $SERVICE_URL"
-        echo "  Frontend: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
+        echo "   Backend API: $SERVICE_URL"
+        echo "   Frontend: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
         echo ""
         echo "Actualiza tu ESP32 con la nueva URL:"
         echo "   #define ERP_URL \"$SERVICE_URL/api/sensors/data\""
