@@ -2,13 +2,28 @@ const express = require('express');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
 require('dotenv').config();
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-// Middleware
-app.use(express.json());
+// Middleware Security
+app.use(helmet());
+app.use(cors());
 app.use(morgan('combined'));
+app.use(express.json());
+app.use(express.text()); 
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 100, // máximo 100 requests por minuto
+  message: 'Too many requests from this IP'
+});
+app.use('/api/', limiter);
 
 
 // Mongo Model
@@ -157,6 +172,16 @@ app.get('/api/sensors/history', async (req, res) => {
   }
 });
 
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
 // API Routes
 // Index
 app.get('/', (req, res) => {
@@ -167,9 +192,20 @@ app.get('/', (req, res) => {
       'POST /api/sensors/data': 'Recibir datos del ESP32',
       'GET /api/sensors/latest': 'Obtener última lectura',
       'GET /api/sensors/history': 'Obtener histórico',
+      'GET /health': 'Health check'
     }
   });
 });
+
+// Erros Handle
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  });
+});
+
 
 // No found routes
 app.use('*', (req, res) => {
@@ -179,14 +215,27 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server after DB connection
+// Servidor started
 const startServer = async () => {
   await connectDB();
+  
   app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`ESP32 endpoint: http://localhost:${PORT}/api/sensors/data`);
   });
 };
 
-startServer();
+// End process
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  mongoose.connection.close();
+  process.exit(0);
+});
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
 
 module.exports = app;
