@@ -43,7 +43,7 @@ jobs:
     - name: Run Backend Tests
       working-directory: ./backend
       run: |
-        npm test || echo "⚠️ Tests completed with warnings - continuing deployment"
+        npm test || echo "Tests completed with warnings - continuing deployment"
     
     - name: Install Frontend Dependencies
       working-directory: ./frontend
@@ -141,7 +141,7 @@ jobs:
       run: |
         echo " Probando despliegue del backend..."
         sleep 30
-        curl -f $SERVICE_URL/health || (echo "❌ Health check falló" && exit 1)
+        curl -f $SERVICE_URL/health || (echo "Health check falló" && exit 1)
         echo "✅ Backend responde correctamente"
     
     - name: Build Frontend for Production
@@ -215,13 +215,9 @@ jobs:
     
     - name: Final Health Check
       run: |
-        echo "🏁 Verificación final del despliegue..."
+        echo "Verificación final del despliegue..."
         echo "Backend URL: $SERVICE_URL"
         echo "Frontend URL: $FRONTEND_URL"
-        
-        # Test final del backend
-        curl -f $SERVICE_URL/health || exit 1
-        curl -f $SERVICE_URL/api/sensors/latest || echo "No hay datos de sensores aún"
         
         # Test frontend
         curl -f $FRONTEND_URL/health || echo "Frontend health check"
@@ -231,9 +227,6 @@ jobs:
         echo " URLs de tu aplicación:"
         echo "   Backend API: $SERVICE_URL"
         echo "   Frontend Web: $FRONTEND_URL"
-        echo ""
-        echo " Actualiza tu ESP32 con la nueva URL:"
-        echo "   #define ERP_URL \"$SERVICE_URL/api/sensors/data\""
 
   security-scan:
     name: Security Scan
@@ -248,10 +241,10 @@ jobs:
       working-directory: ./backend
       run: |
         npm ci
-        npm audit --audit-level high || echo "⚠️ Vulnerabilidades encontradas pero no críticas"
+        npm audit --audit-level high || echo "Vulnerabilidades encontradas pero no críticas"
     
     - name: Run npm audit for Frontend
       working-directory: ./frontend
       run: |
         npm ci
-        npm audit --audit-level high || echo "⚠️ Vulnerabilidades encontradas pero no críticas"
+        npm audit --audit-level high || echo "Vulnerabilidades encontradas pero no críticas"

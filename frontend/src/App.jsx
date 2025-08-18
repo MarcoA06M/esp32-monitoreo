@@ -35,7 +35,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const App = () => {
   const [latestData, setLatestData] = useState(null);
   const [historyData, setHistoryData] = useState([]);
-  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -72,26 +71,13 @@ const App = () => {
     }
   };
 
-  // Función para obtener estadísticas
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/sensors/stats`);
-      if (response.data.success) {
-        setStats(response.data.data);
-      }
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
-  };
-
   // Cargar datos inicial
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       await Promise.all([
         fetchLatestData(),
-        fetchHistoryData(),
-        fetchStats()
+        fetchHistoryData()
       ]);
       setLoading(false);
     };
@@ -327,51 +313,6 @@ const App = () => {
             </Card>
           </Col>
         </Row>
-
-        {/* Estadísticas generales */}
-        {stats && (
-          <Row gutter={[16, 16]}>
-            <Col span={24}>
-              <Card title="Estadisticas">
-                <Row gutter={[16, 16]}>
-                  <Col xs={12} md={6}>
-                    <Statistic
-                      title="Temp. Promedio"
-                      value={stats.avgTemperatura || 0}
-                      precision={1}
-                      suffix="°C"
-                    />
-                  </Col>
-                  <Col xs={12} md={6}>
-                    <Statistic
-                      title="Humedad Amb. Prom."
-                      value={stats.avgHumedadAmbiente || 0}
-                      precision={1}
-                      suffix="%"
-                    />
-                  </Col>
-                  <Col xs={12} md={6}>
-                    <Statistic
-                      title="Humedad Suelo Prom."
-                      value={stats.avgHumedadSuelo || 0}
-                      precision={1}
-                      suffix="%"
-                    />
-                  </Col>
-                  <Col xs={12} md={6}>
-                    <Statistic
-                      title="Total Alertas"
-                      value={stats.totalAlertas || 0}
-                      valueStyle={{ color: stats.totalAlertas > 0 ? '#ff4d4f' : '#3f8600' }}
-                    />
-                  </Col>
-                </Row>
-              </Card>
-            </Col>
-          </Row>
-        )}
-
-
       </Content>
     </Layout>
   );
