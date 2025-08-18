@@ -43,7 +43,7 @@ jobs:
     - name: Run Backend Tests
       working-directory: ./backend
       run: |
-        npm test || echo "Tests completed with warnings - continuing deployment"
+        npm test || echo "⚠️ Tests completed with warnings - continuing deployment"
     
     - name: Install Frontend Dependencies
       working-directory: ./frontend
@@ -166,12 +166,17 @@ jobs:
         # Hacer bucket público
         gsutil iam ch allUsers:objectViewer gs://${PROJECT_ID}-frontend
         
-        # Subir archivos del frontend
+        # Subir archivos del frontend con estructura correcta
         gsutil -m rsync -r -d frontend/dist gs://${PROJECT_ID}-frontend
         
-        # Configurar headers de cache
-        gsutil -m setmeta -h "Cache-Control:public,max-age=31536000" gs://${PROJECT_ID}-frontend/**/*.js
-        gsutil -m setmeta -h "Cache-Control:public,max-age=31536000" gs://${PROJECT_ID}-frontend/**/*.css
+        # Configurar headers de cache y CORS
+        gsutil -m setmeta -h "Cache-Control:public,max-age=31536000" gs://${PROJECT_ID}-frontend/assets/*
+        gsutil -m setmeta -h "Cache-Control:no-cache" gs://${PROJECT_ID}-frontend/index.html
+        
+        # Configurar CORS para el bucket
+        echo '[{"origin": ["*"], "method": ["GET"], "responseHeader": ["Content-Type"], "maxAgeSeconds": 3600}]' > cors.json
+        gsutil cors set cors.json gs://${PROJECT_ID}-frontend
+        rm cors.json
         
         echo "✅ Frontend desplegado en: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
     
@@ -187,7 +192,7 @@ jobs:
         
         echo "✅ ¡Despliegue completado exitosamente!"
         echo ""
-        echo " URLs de tu aplicación:"
+        echo "URLs de tu aplicación:"
         echo "   Backend API: $SERVICE_URL"
         echo "   Frontend: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
         echo ""
