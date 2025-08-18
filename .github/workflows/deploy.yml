@@ -147,54 +147,69 @@ jobs:
     - name: Build Frontend for Production
       working-directory: ./frontend
       run: |
-        echo "Construyendo frontend para producción..."
+        echo "🔨 Construyendo frontend para producción..."
         npm ci
         npm run build
       env:
         VITE_API_URL: ${{ steps.backend-deploy.outputs.backend_url }}
     
-    - name: Deploy Frontend to Cloud Storage
+    - name: Build Frontend Docker Image
       run: |
-        echo "Desplegando frontend a Cloud Storage..."
-        
-        # Crear bucket si no existe
-        gsutil mb -p $PROJECT_ID gs://${PROJECT_ID}-frontend || echo "Bucket ya existe"
-        
-        # Configurar bucket para sitio web
-        gsutil web set -m index.html -e index.html gs://${PROJECT_ID}-frontend
-        
-        # Hacer bucket público
-        gsutil iam ch allUsers:objectViewer gs://${PROJECT_ID}-frontend
-        
-        # Subir archivos del frontend con estructura correcta
-        gsutil -m rsync -r -d frontend/dist gs://${PROJECT_ID}-frontend
-        
-        # Configurar headers de cache y CORS
-        gsutil -m setmeta -h "Cache-Control:public,max-age=31536000" gs://${PROJECT_ID}-frontend/assets/*
-        gsutil -m setmeta -h "Cache-Control:no-cache" gs://${PROJECT_ID}-frontend/index.html
-        
-        # Configurar CORS para el bucket
-        echo '[{"origin": ["*"], "method": ["GET"], "responseHeader": ["Content-Type"], "maxAgeSeconds": 3600}]' > cors.json
-        gsutil cors set cors.json gs://${PROJECT_ID}-frontend
-        rm cors.json
-        
-        echo "✅ Frontend desplegado en: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
+        echo "Construyendo imagen Docker del frontend..."
+        cd frontend
+        docker build . --platform linux/amd64 \
+          -t $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA \
+          -t $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:latest
+        echo "✅ Imagen frontend construida"
+    
+    - name: Push Frontend Docker Image
+      run: |
+        echo "Subiendo imagen frontend a Artifact Registry..."
+        docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA
+        docker push $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:latest
+        echo "✅ Imagen frontend subida"
+    
+    - name: Deploy Frontend to Cloud Run
+      run: |
+        echo "Desplegando frontend a Cloud Run..."
+        gcloud run deploy esp32-monitor-frontend \
+          --image $REGISTRY_URL/$PROJECT_ID/$REPOSITORY/esp32-monitor-frontend:$GITHUB_SHA \
+          --platform managed \
+          --region $REGION \
+          --allow-unauthenticated \
+          --port 80 \
+          --memory 256Mi \
+          --cpu 0.5 \
+          --max-instances 5 \
+          --min-instances 0 \
+          --concurrency 100 \
+          --timeout 300
+        echo "✅ Frontend desplegado exitosamente"
+    
+    - name: Get Frontend Service URL
+      run: |
+        FRONTEND_URL=$(gcloud run services describe esp32-monitor-frontend --region=$REGION --format='value(status.url)')
+        echo "Frontend desplegado en: $FRONTEND_URL"
+        echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
     
     - name: Final Health Check
       run: |
-        echo "Verificación final del despliegue..."
+        echo "🏁 Verificación final del despliegue..."
         echo "Backend URL: $SERVICE_URL"
-        echo "Frontend URL: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
+        echo "Frontend URL: $FRONTEND_URL"
         
         # Test final del backend
         curl -f $SERVICE_URL/health || exit 1
         curl -f $SERVICE_URL/api/sensors/latest || echo "No hay datos de sensores aún"
         
-        echo "✅ ¡Despliegue completado exitosamente!"
+        # Test frontend
+        curl -f $FRONTEND_URL/health || echo "Frontend health check"
+        
+        echo "¡Despliegue completado exitosamente!"
         echo ""
         echo "URLs de tu aplicación:"
         echo "   Backend API: $SERVICE_URL"
-        echo "   Frontend: https://storage.googleapis.com/${PROJECT_ID}-frontend/index.html"
+        echo "   Frontend Web: $FRONTEND_URL"
         echo ""
         echo "Actualiza tu ESP32 con la nueva URL:"
         echo "   #define ERP_URL \"$SERVICE_URL/api/sensors/data\""
