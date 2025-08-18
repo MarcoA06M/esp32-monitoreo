@@ -10,7 +10,7 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   SERVICE_NAME: esp32-monitor-backend
   REGION: us-central1
-  REPOSITORY: esp32-monitor-repo
+  REPOSITORY: esp32-monitoreo
   IMAGE_NAME: esp32-monitor-backend
   REGISTRY_URL: us-central1-docker.pkg.dev
 
@@ -90,7 +90,7 @@ jobs:
     
     - name: Configure Docker for Artifact Registry
       run: |
-        echo "🐳 Configurando Docker para Artifact Registry..."
+        echo "Configurando Docker para Artifact Registry..."
         gcloud auth configure-docker $REGISTRY_URL --quiet
         echo "✅ Docker configurado"
     
