@@ -149,7 +149,26 @@ jobs:
       run: |
         echo " Construyendo frontend para producción..."
         npm ci
+        
+        # Limpiar build anterior
+        rm -rf dist/
+        
+        # Build normal
         npm run build
+        
+        # FIXEAR rutas en index.html después del build
+        echo " Corrigiendo rutas en index.html..."
+        sed -i 's|src="/assets/|src="./assets/|g' dist/index.html
+        sed -i 's|href="/assets/|href="./assets/|g' dist/index.html
+        
+        # Verificar que se corrigió
+        echo " Rutas corregidas en index.html:"
+        grep -E "(src=|href=)" dist/index.html
+        
+        # Verificar archivos generados
+        echo " Archivos generados:"
+        ls -la dist/
+        ls -la dist/assets/
       env:
         VITE_API_URL: ${{ steps.backend-deploy.outputs.backend_url }}
     
@@ -196,7 +215,7 @@ jobs:
     
     - name: Final Health Check
       run: |
-        echo " Verificación final del despliegue..."
+        echo "🏁 Verificación final del despliegue..."
         echo "Backend URL: $SERVICE_URL"
         echo "Frontend URL: $FRONTEND_URL"
         
