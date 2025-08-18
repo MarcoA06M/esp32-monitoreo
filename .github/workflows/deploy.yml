@@ -147,7 +147,7 @@ jobs:
     - name: Build Frontend for Production
       working-directory: ./frontend
       run: |
-        echo "🔨 Construyendo frontend para producción..."
+        echo "Construyendo frontend para producción..."
         npm ci
         npm run build
       env:
@@ -178,11 +178,11 @@ jobs:
           --region $REGION \
           --allow-unauthenticated \
           --port 80 \
-          --memory 256Mi \
-          --cpu 0.5 \
+          --memory 512Mi \
+          --cpu 1 \
           --max-instances 5 \
           --min-instances 0 \
-          --concurrency 100 \
+          --concurrency 80 \
           --timeout 300
         echo "✅ Frontend desplegado exitosamente"
     
@@ -194,7 +194,7 @@ jobs:
     
     - name: Final Health Check
       run: |
-        echo "🏁 Verificación final del despliegue..."
+        echo "Verificación final del despliegue..."
         echo "Backend URL: $SERVICE_URL"
         echo "Frontend URL: $FRONTEND_URL"
         
@@ -205,13 +205,13 @@ jobs:
         # Test frontend
         curl -f $FRONTEND_URL/health || echo "Frontend health check"
         
-        echo "¡Despliegue completado exitosamente!"
+        echo "✅ ¡Despliegue completado exitosamente!"
         echo ""
         echo "URLs de tu aplicación:"
         echo "   Backend API: $SERVICE_URL"
         echo "   Frontend Web: $FRONTEND_URL"
         echo ""
-        echo "Actualiza tu ESP32 con la nueva URL:"
+        echo "📝 Actualiza tu ESP32 con la nueva URL:"
         echo "   #define ERP_URL \"$SERVICE_URL/api/sensors/data\""
 
   security-scan:
